@@ -1,3 +1,4 @@
+import json
 import uuid
 from pathlib import Path
 
@@ -8,12 +9,37 @@ from agent.seat_agent import build_agent, stream_turn
 from backend import campus_api
 
 WORKSPACE = Path(__file__).resolve().parent / "workspace"
+SESSION_DIR = Path(__file__).resolve().parent / "data" / "sessions"
 EXAMPLES = [
     "明天下午图书馆三楼还有靠窗的空位吗？",
     "帮我约明天 14:00-16:00 三楼一个靠窗空位",
     "我有哪些预约？把后天那个取消掉",
     "把我本周的预约整理成周报",
 ]
+
+
+# ---------- 会话落盘：刷新页面 / 关掉浏览器再打开，对话还在 ----------
+def _session_file(tid: str) -> Path:
+    SESSION_DIR.mkdir(parents=True, exist_ok=True)
+    return SESSION_DIR / f"{tid}.json"
+
+
+def load_messages(tid: str) -> list:
+    path = _session_file(tid)
+    if not path.exists():
+        return []
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return []
+
+
+def save_messages(tid: str, messages: list) -> None:
+    try:
+        _session_file(tid).write_text(
+            json.dumps(messages, ensure_ascii=False), encoding="utf-8")
+    except Exception:
+        pass
 
 st.set_page_config(page_title="校园自习室座位预约助手", page_icon="📚")
 st.markdown("<style>[data-testid='stToolbar'], [data-testid='stStatusWidget'] {display: none;}</style>",
@@ -58,18 +84,32 @@ def run_turn(payload) -> None:
     if result["text"] or steps:
         st.session_state["messages"].append({"role": "assistant", "content": result["text"], "steps": steps})
     st.session_state["pending"] = result["interrupt"]
+    save_messages(st.session_state["thread_id"], st.session_state["messages"])   # 落盘，刷新可恢复
     st.rerun()
 
 
+# 会话 ID：优先读 URL 里的 ?t=，没有就新建并写回 URL（这样刷新能接上）
+_qp = st.query_params
+if not _qp.get("t"):
+    _qp["t"] = uuid.uuid4().hex
+_tid = _qp["t"]
+
+# 换了会话（首次进入 / 刷新 / 打开带 t 的链接）→ 从磁盘把消息恢复回来
+if st.session_state.get("thread_id") != _tid:
+    st.session_state["thread_id"] = _tid
+    st.session_state["messages"] = load_messages(_tid)
+    st.session_state["pending"] = None
+
 st.session_state.setdefault("messages", [])
-st.session_state.setdefault("thread_id", uuid.uuid4().hex)
 st.session_state.setdefault("pending", None)
 
 with st.sidebar:
     st.subheader("当前学生")
     st.write("张同学（2023000001，虚构）")
     if st.button("新会话", use_container_width=True):
-        st.session_state.update(messages=[], thread_id=uuid.uuid4().hex, pending=None)
+        new_tid = uuid.uuid4().hex
+        st.query_params["t"] = new_tid          # 先改 URL，避免 rerun 后被旧值覆盖
+        st.session_state.update(messages=[], thread_id=new_tid, pending=None)
         st.rerun()
     st.subheader("示例问题")
     for i, example in enumerate(EXAMPLES):
