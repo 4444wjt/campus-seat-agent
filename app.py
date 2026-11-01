@@ -1,5 +1,6 @@
 import json
 import uuid
+from datetime import datetime
 from pathlib import Path
 
 import streamlit as st
@@ -40,6 +41,33 @@ def save_messages(tid: str, messages: list) -> None:
             json.dumps(messages, ensure_ascii=False), encoding="utf-8")
     except Exception:
         pass
+
+
+def list_sessions(limit: int = 8) -> list:
+    """按最近修改倒序列出**有内容**的会话（空会话不列）。"""
+    out = []
+    try:
+        files = sorted(SESSION_DIR.glob("*.json"),
+                       key=lambda p: p.stat().st_mtime, reverse=True)
+    except Exception:
+        return out
+    for path in files:
+        try:
+            msgs = json.loads(path.read_text(encoding="utf-8"))
+        except Exception:
+            continue
+        first_user = next((m.get("content", "") for m in msgs if m.get("role") == "user"), "")
+        if not first_user:
+            continue
+        out.append({
+            "tid": path.stem,
+            "mtime": path.stat().st_mtime,
+            "preview": first_user.replace("\n", " ")[:26],
+            "turns": sum(1 for m in msgs if m.get("role") == "user"),
+        })
+        if len(out) >= limit:
+            break
+    return out
 
 st.set_page_config(page_title="校园自习室座位预约助手", page_icon="📚")
 st.markdown("<style>[data-testid='stToolbar'], [data-testid='stStatusWidget'] {display: none;}</style>",
@@ -111,6 +139,27 @@ with st.sidebar:
         st.query_params["t"] = new_tid          # 先改 URL，避免 rerun 后被旧值覆盖
         st.session_state.update(messages=[], thread_id=new_tid, pending=None)
         st.rerun()
+
+    # ---------- 历史会话（点一下切回去） ----------
+    sessions = list_sessions()
+    if sessions:
+        st.subheader("历史会话")
+        for s in sessions:
+            is_current = (s["tid"] == st.session_state["thread_id"])
+            when = datetime.fromtimestamp(s["mtime"]).strftime("%m-%d %H:%M")
+            label = f"{'▶ 当前 · ' if is_current else ''}{when}｜{s['preview']}"
+            if st.button(label, key=f"s_{s['tid']}", use_container_width=True,
+                         disabled=is_current or bool(st.session_state["pending"])):
+                st.query_params["t"] = s["tid"]
+                st.session_state.update(
+                    thread_id=s["tid"],
+                    messages=load_messages(s["tid"]),
+                    pending=None,
+                )
+                st.rerun()
+    else:
+        st.caption("还没有历史会话。发第一条消息后，这里会出现记录。")
+
     st.subheader("示例问题")
     for i, example in enumerate(EXAMPLES):
         if st.button(example, key=f"example_{i}", use_container_width=True,
