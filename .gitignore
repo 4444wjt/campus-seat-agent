@@ -1,0 +1,12 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.env
+data/
+workspace/*
+!workspace/.gitkeep
+_ref/
+_shot/
+task-brief.md
+.claude/

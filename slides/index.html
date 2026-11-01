@@ -1,0 +1,581 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>校园自习室座位预约助手 · 期末汇报</title>
+<style>
+  :root{
+    --bg:#0B1117; --panel:#111A23; --line:#1E2A36;
+    --text:#E6EAF2; --muted:#93A0B4; --dim:#6B7A8D;
+    --gold:#F2C879; --ok:#7FE0A8; --warn:#F2A15C; --red:#F08A8A;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    background:var(--bg); color:var(--text);
+    font-family:-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+    overflow:hidden;
+  }
+  .deck{height:100vh;width:100vw;position:relative}
+  .slide{
+    position:absolute;inset:0;display:none;flex-direction:column;
+    padding:52px 88px 88px;overflow-y:auto;
+    justify-content:center;
+  }
+  .slide.active{display:flex}
+
+  .kicker{color:var(--gold);font-size:13px;letter-spacing:.14em;font-weight:650;margin-bottom:14px}
+  h1{font-size:52px;font-weight:800;line-height:1.15;letter-spacing:-.02em;margin-bottom:18px}
+  h2{font-size:36px;font-weight:750;line-height:1.25;letter-spacing:-.015em;margin-bottom:10px}
+  h3{font-size:19px;font-weight:650;line-height:1.4;margin-bottom:8px}
+  p,li{font-size:16px;line-height:1.75;color:var(--text)}
+  .lead{font-size:18px;line-height:1.7;color:var(--muted);max-width:960px}
+  .sub{color:var(--muted);font-size:16px;line-height:1.7}
+  .dim{color:var(--dim);font-size:13px;line-height:1.6}
+  .sect-sub{font-size:17px;line-height:1.7;color:var(--muted);margin-bottom:24px;max-width:900px}
+  code{background:#182430;color:var(--gold);padding:2px 7px;border-radius:5px;font-size:.92em;
+       font-family:ui-monospace,Consolas,monospace}
+  b{color:var(--gold);font-weight:650}
+
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:22px;margin-top:8px}
+  .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:8px}
+  .card{
+    background:var(--panel);border:1px solid var(--line);border-radius:14px;
+    padding:22px 24px;
+  }
+  .card .num{
+    display:inline-flex;align-items:center;justify-content:center;
+    width:26px;height:26px;border-radius:50%;background:var(--gold);color:#0B1117;
+    font-size:13px;font-weight:750;margin-bottom:12px;
+  }
+  .card h3{color:var(--text)}
+  .card p{font-size:15px;line-height:1.7;color:var(--muted)}
+  .card.hi{border-color:rgba(242,200,121,.42);background:rgba(242,200,121,.05)}
+  .card.hi h3{color:var(--gold)}
+
+  /* 架构图 */
+  .flow{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:26px 0 14px}
+  .node{
+    background:var(--panel);border:1px solid var(--line);border-radius:12px;
+    padding:14px 18px;min-width:130px;
+  }
+  .node .k{font-size:11.5px;color:var(--dim);letter-spacing:.08em;margin-bottom:5px}
+  .node .v{font-size:15px;font-weight:650;color:var(--text)}
+  .arrow{color:var(--gold);font-size:20px;font-weight:700}
+
+  table{border-collapse:collapse;width:100%;margin-top:10px}
+  th,td{text-align:left;padding:11px 14px;border-bottom:1px solid var(--line);font-size:15px;line-height:1.6}
+  th{color:var(--dim);font-weight:600;font-size:12.5px;letter-spacing:.06em}
+  td{color:var(--text)}
+  tr:last-child td{border-bottom:none}
+  td.mono{font-family:ui-monospace,Consolas,monospace;font-size:14px;color:var(--gold)}
+
+  .pill{display:inline-block;padding:2px 9px;border-radius:20px;font-size:12px;font-weight:650}
+  .pill.ok{background:#12251C;color:var(--ok);border:1px solid #1F4A34}
+  .pill.warn{background:#2A1E14;color:var(--warn);border:1px solid #5A3B1E}
+  .pill.no{background:#2A1616;color:var(--red);border:1px solid #5A2A2A}
+
+  .quote{
+    border-left:3px solid var(--gold);padding:14px 20px;margin:18px 0 0;
+    background:#0F1820;border-radius:0 10px 10px 0;color:var(--muted);
+    font-size:16px;line-height:1.75;
+  }
+  ol,ul{padding-left:22px}
+  li{margin-bottom:8px}
+
+  /* 页脚 */
+  .footer{
+    position:fixed;left:88px;right:88px;bottom:26px;
+    display:flex;align-items:center;justify-content:space-between;
+    font-size:12.5px;color:var(--dim);
+    pointer-events:none;
+  }
+  .progress{position:fixed;left:0;right:0;bottom:0;height:2px;background:#141C25}
+  .progress i{display:block;height:100%;background:var(--gold);transition:width .28s ease}
+
+  /* 底部控制条 */
+  .controls{
+    position:fixed;left:50%;transform:translateX(-50%);bottom:52px;
+    display:flex;align-items:center;gap:6px;padding:6px 8px;border-radius:999px;
+    background:rgba(17,26,35,.86);border:1px solid var(--line);
+    backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+    box-shadow:0 6px 24px rgba(0,0,0,.4);z-index:30;
+    transition:opacity .25s ease;
+  }
+  .controls.hide{opacity:0;pointer-events:none}
+  .ctl{
+    height:30px;min-width:30px;padding:0 12px;border-radius:999px;
+    border:1px solid transparent;background:transparent;color:var(--muted);
+    font-size:13px;font-weight:600;cursor:pointer;
+    transition:background .18s ease,color .18s ease,border-color .18s ease;
+    font-family:inherit;
+  }
+  .ctl:hover{background:rgba(242,200,121,.13);color:var(--gold);border-color:rgba(242,200,121,.3)}
+  .ctl:active{transform:scale(.96)}
+  .ctl:disabled{opacity:.32;cursor:not-allowed;background:transparent;color:var(--dim)}
+  .ctl.arrow{font-size:17px;font-weight:700;line-height:1;padding:0}
+  .ctl.auto{font-size:12.5px;letter-spacing:.02em}
+  .ctl.auto.on{background:rgba(242,200,121,.18);color:var(--gold);border-color:rgba(242,200,121,.45)}
+  .ctlnum{
+    font-size:12.5px;color:var(--muted);font-variant-numeric:tabular-nums;
+    min-width:52px;text-align:center;letter-spacing:.02em;
+  }
+  .ctldiv{width:1px;height:16px;background:var(--line);margin:0 3px}
+
+  .hint{position:fixed;right:26px;bottom:26px;font-size:11.5px;color:#3F4C5C}
+
+  /* 封面 */
+  .cover{justify-content:center;align-items:flex-start}
+  .cover .meta{margin-top:38px;display:flex;gap:44px;flex-wrap:wrap}
+  .cover .meta div .k{font-size:12px;color:var(--dim);letter-spacing:.08em;margin-bottom:5px}
+  .cover .meta div .v{font-size:16px;color:var(--text);font-weight:600}
+
+  /* 场景小卡（痛点页用） */
+  .scene{
+    display:flex;gap:14px;align-items:flex-start;
+    background:var(--panel);border:1px solid var(--line);border-radius:12px;
+    padding:16px 18px;margin-bottom:12px;
+  }
+  .scene .ico{
+    flex:0 0 34px;width:34px;height:34px;border-radius:9px;
+    display:flex;align-items:center;justify-content:center;
+    background:rgba(242,200,121,.12);color:var(--gold);font-size:16px;font-weight:750;
+  }
+  .scene .txt{flex:1}
+  .scene .txt .t{font-size:16.5px;font-weight:650;margin-bottom:4px;line-height:1.4}
+  .scene .txt .d{font-size:15px;color:var(--muted);line-height:1.7}
+</style>
+</head>
+<body>
+<div class="deck" id="deck">
+
+<!-- ========== 1 封面 ========== -->
+<section class="slide cover active">
+  <div class="kicker">开源 AI 技术实践 · 期末汇报</div>
+  <h1>校园自习室座位预约助手</h1>
+  <p class="lead">说一句话 → Agent 自己去查空座 → 弹卡片问你 → 你点头才真的占座</p>
+  <div class="meta">
+    <div><div class="k">姓名 / 学号</div><div class="v">＿＿＿＿ / ＿＿＿＿</div></div>
+    <div><div class="k">技术栈</div><div class="v">Streamlit + LangChain + DeepSeek</div></div>
+    <div><div class="k">工具 / 页面</div><div class="v">7 个工具 · 12 页</div></div>
+    <div><div class="k">日期</div><div class="v">2026-11-01</div></div>
+  </div>
+</section>
+
+<!-- ========== 2 谁在什么时候需要它（痛点） ========== -->
+<section class="slide">
+  <div class="kicker">01 · 要解决的问题</div>
+  <h2>考试周前一晚，你站在图书馆门口</h2>
+  <p class="sect-sub">这不是假设。每个学校、每个期末，都在重复同一件事。</p>
+
+  <div>
+    <div class="scene">
+      <div class="ico">1</div>
+      <div class="txt">
+        <div class="t">跑空</div>
+        <div class="d">走路 15 分钟到图书馆，推门发现满座。再走 10 分钟去教学楼，还是满座。来回几十分钟，一页书没看。</div>
+      </div>
+    </div>
+    <div class="scene">
+      <div class="ico">2</div>
+      <div class="txt">
+        <div class="t">抢座</div>
+        <div class="d">早上 7 点占座，人走了书还摊着。真正想学的人没座位，占着的人一整天不出现。没人管得了。</div>
+      </div>
+    </div>
+    <div class="scene">
+      <div class="ico">3</div>
+      <div class="txt">
+        <div class="t">三套系统，互相不知道</div>
+        <div class="d">图书馆有自己的小程序，教务系统里查不到自习室，微信公号又发一套通知。想查个空座，要打开三个地方。</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="quote">
+    <b>真正的问题不是「没有座位」</b>，而是 —— <b>不知道哪里有座位，知道了也占不到，占到了也没人管</b>。
+    这三件事，恰好是「一句话 + 一个 Agent + 一次确认」能解决的。
+  </div>
+</section>
+
+<!-- ========== 3 七个工具 ========== -->
+<section class="slide">
+  <div class="kicker">02 · 核心设计</div>
+  <h2>模型不查库，它只「点菜」</h2>
+  <p class="sect-sub">大模型只会说话，不会读写数据库。真正干活的是 7 个函数，模型只负责决定「该叫哪个」。</p>
+
+  <table>
+    <thead><tr><th style="width:110px">类别</th><th style="width:300px">工具</th><th>干什么</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><span class="pill ok">查</span></td>
+        <td class="mono">list_rooms</td>
+        <td>有哪些自习室、几点能约、靠窗还是插座</td>
+      </tr>
+      <tr>
+        <td><span class="pill ok">查</span></td>
+        <td class="mono">query_free_seats</td>
+        <td>某室某天某时段，哪些座空着</td>
+      </tr>
+      <tr>
+        <td><span class="pill ok">查</span></td>
+        <td class="mono">my_bookings</td>
+        <td>我约了哪些（写周报时也用它）</td>
+      </tr>
+      <tr>
+        <td><span class="pill no">改</span></td>
+        <td class="mono">book_seat</td>
+        <td>约一个座位 <b>⚠️ 会弹确认</b></td>
+      </tr>
+      <tr>
+        <td><span class="pill no">改</span></td>
+        <td class="mono">cancel_booking</td>
+        <td>取消一条预约 <b>⚠️ 会弹确认</b></td>
+      </tr>
+      <tr>
+        <td><span class="pill warn">元</span></td>
+        <td class="mono">export_weekly_report</td>
+        <td>把本周自习记录生成一份周报文件</td>
+      </tr>
+      <tr>
+        <td><span class="pill warn">元</span></td>
+        <td class="mono">read_skill</td>
+        <td>读「技能说明书」，模型知道自己该怎么做</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="quote">
+    每个工具都带一段<b>「说明书」</b>，写着「我是干什么的、要什么参数」。模型看一眼就知道该拿哪个 ——
+    <b>就像工具箱上贴着标签，新员工不用人教也能找到螺丝刀</b>。
+  </div>
+</section>
+
+<!-- ========== 4 四层架构 ========== -->
+<section class="slide">
+  <div class="kicker">03 · 架构</div>
+  <h2>一条链路，四层各管各的</h2>
+  <p class="sect-sub">每层只做一件事，出了问题能立刻知道是哪一层。</p>
+
+  <div class="flow">
+    <div class="node"><div class="k">第 1 层</div><div class="v">你（说话）</div></div>
+    <span class="arrow">→</span>
+    <div class="node"><div class="k">第 2 层</div><div class="v">Streamlit 界面</div></div>
+    <span class="arrow">→</span>
+    <div class="node"><div class="k">第 3 层</div><div class="v">LangChain Agent</div></div>
+    <span class="arrow">→</span>
+    <div class="node"><div class="k">第 4 层</div><div class="v">7 个工具</div></div>
+    <span class="arrow">→</span>
+    <div class="node"><div class="k">数据</div><div class="v">SQLite</div></div>
+  </div>
+
+  <div class="grid2" style="margin-top:24px">
+    <div class="card">
+      <h3>界面层（Streamlit）</h3>
+      <p>只干三件事：显示对话、折叠显示「执行过程」、在需要确认时弹按钮。<br>不写业务逻辑。</p>
+    </div>
+    <div class="card">
+      <h3>Agent 层（LangChain）</h3>
+      <p>决定「这一步该调哪个工具」。它不查库，只做调度。<br>这一层换了，上下两层都不用动。</p>
+    </div>
+    <div class="card">
+      <h3>工具层（7 个函数）</h3>
+      <p>真正查库、改库的地方。每个函数都有参数校验和业务规则。<br>模型只能通过它碰数据。</p>
+    </div>
+    <div class="card">
+      <h3>数据层（模拟教务）</h3>
+      <p>假的学生、假的自习室、真的 SQLite。6 个业务接口 + 预约规则。<br>换成真实系统只要换这一层。</p>
+    </div>
+  </div>
+
+  <div class="quote">
+    <b>四层刚好够用</b>：再加一层就多一处要改的地方，少一层就分不清「模型错了」还是「数据错了」。
+  </div>
+</section>
+
+<!-- ========== 5 为什么弹确认（核心） ========== -->
+<section class="slide">
+  <div class="kicker">04 · 安全设计（最重要的一页）</div>
+  <h2>「查」随便跑，「改」必须问人</h2>
+  <p class="sect-sub">这是整个项目最花心思的地方，也是它和「随便套个 ChatGPT」最大的区别。</p>
+
+  <div class="grid2">
+    <div class="card hi">
+      <h3>✅ 可以直接做</h3>
+      <p style="line-height:2">
+        · 列出自习室<br>
+        · 查某个时段的空座<br>
+        · 查我的预约<br>
+        · 生成周报文件
+      </p>
+      <p style="margin-top:10px;font-size:13px;color:var(--dim)">
+        查错了最多是「信息不对」，你再看一眼就行。
+      </p>
+    </div>
+    <div class="card" style="border-color:#5A2A2A;background:rgba(240,138,138,.05)">
+      <h3 style="color:var(--red)">⚠️ 必须先确认</h3>
+      <p style="line-height:2">
+        · <b>约座</b><br>
+        · <b>取消预约</b>
+      </p>
+      <p style="margin-top:10px;font-size:13px;color:var(--dim)">
+        改错了，你的座位就没了 —— 而且没人点过头。
+      </p>
+    </div>
+  </div>
+
+  <div class="quote">
+    <b>模型会犯错。</b>它可能把「明天」听成「今天」，把「12 号」说成「21 号」，甚至把「取消明天」理解成「取消今天」。
+    如果让它直接改数据库，<b>这些错误不会有任何人拦住</b>。<br><br>
+    <b>所以这不是「技术做不到」，而是「故意不让它自己决定」</b> —— 责任留给人。
+  </div>
+</section>
+
+<!-- ========== 6 结论来自工具事实 ========== -->
+<section class="slide">
+  <div class="kicker">05 · 可信度</div>
+  <h2>座位号是查出来的，不是编出来的</h2>
+  <p class="sect-sub">大模型有一个坏毛病：不知道的时候会「编一个看起来合理的答案」。这个项目从设计上堵死了这条路。</p>
+
+  <table>
+    <thead><tr><th style="width:50%">模型负责</th><th>工具负责</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>听懂「三楼靠窗」指的是哪间自习室</td>
+        <td>这间自习室到底有没有靠窗的座</td>
+      </tr>
+      <tr>
+        <td>理解「明天下午」大概是几点到几点</td>
+        <td>这个时段具体空着哪几个座位号</td>
+      </tr>
+      <tr>
+        <td>把查询结果讲人话给你听</td>
+        <td>预约编号、座位号、剩余名额 —— 全部是查出来的</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="grid2" style="margin-top:22px">
+    <div class="card">
+      <h3>如果模型不调工具就作答</h3>
+      <p>界面会在执行过程里<b>明确警告</b>，并提示「本轮没有工具被调用，结论不可信」。<br>不让它蒙混过关。</p>
+    </div>
+    <div class="card">
+      <h3>为什么要这么设计</h3>
+      <p>座位预约是<b>要真占资源</b>的事。如果模型编一个「12 号座已为你约好」，你去了一看是空的 —— 比不做还糟。</p>
+    </div>
+  </div>
+
+  <div class="quote">
+    一句话：<b>模型负责「听懂人话」，工具负责「说真话」</b>。两者分开，才敢把它放到真实场景里。
+  </div>
+</section>
+
+<!-- ========== 7 周报 Skill ========== -->
+<section class="slide">
+  <div class="kicker">06 · Skill 机制</div>
+  <h2>一份说明书 + 一个模板，用时才翻</h2>
+  <p class="sect-sub">「写周报」不是简单一句话，它有固定的步骤和格式。这些细节不适合全部塞进提示词。</p>
+
+  <div class="grid3">
+    <div class="card">
+      <div class="num">1</div>
+      <h3>你说一句</h3>
+      <p>「帮我写这周的自习周报」</p>
+    </div>
+    <div class="card">
+      <div class="num">2</div>
+      <h3>模型先读说明书</h3>
+      <p>调 <code>read_skill("weekly-report")</code>，拿到 <code>SKILL.md</code>（怎么做）+ <code>template.md</code>（什么格式）</p>
+    </div>
+    <div class="card">
+      <div class="num">3</div>
+      <h3>再按说明干活</h3>
+      <p>调 <code>my_bookings(include_past=True)</code> 拿数据 → 按模板组织 → 调 <code>export_weekly_report</code> 生成文件</p>
+    </div>
+  </div>
+
+  <div class="grid2" style="margin-top:20px">
+    <div class="card">
+      <h3>为什么不直接把规则写进提示词</h3>
+      <p>提示词会变得极长，模型反而抓不住重点，每次都白花 token。<br><b>而且以后加第二个、第三个技能，提示词会越来越臃肿。</b></p>
+    </div>
+    <div class="card">
+      <h3>Skill 的思路</h3>
+      <p>提示词里只列「有哪些技能可用」，具体怎么做的细节放在文件里。<br><b>就像宜家说明书 —— 装的时候才翻那一页，不用把整本背下来。</b></p>
+    </div>
+  </div>
+</section>
+
+<!-- ========== 8 四条演示话术 ========== -->
+<section class="slide">
+  <div class="kicker">07 · 现场演示</div>
+  <h2>四条话术，现场可走</h2>
+  <p class="sect-sub">不是录屏，是当场输入、当场出结果。每条都标了背后调了哪些工具。</p>
+
+  <div class="scene">
+    <div class="ico">1</div>
+    <div class="txt">
+      <div class="t">「三楼明天下午还有空座吗？」</div>
+      <div class="d">→ 调 <code>query_free_seats</code>，返回具体座位号和靠窗/插座情况。<b>只查，不弹确认。</b></div>
+    </div>
+  </div>
+  <div class="scene">
+    <div class="ico">2</div>
+    <div class="txt">
+      <div class="t">「帮我约一个靠窗的」</div>
+      <div class="d">→ 先查空座 → 再调 <code>book_seat</code> <b>⚠️ 弹确认卡片：「即将预约：三楼 12 号座，明天 14:00-16:00」</b>，你点确认才真的占座。</div>
+    </div>
+  </div>
+  <div class="scene">
+    <div class="ico">3</div>
+    <div class="txt">
+      <div class="t">「我最近约了哪些？」</div>
+      <div class="d">→ 调 <code>my_bookings</code>，列出编号、自习室、座位、时段。</div>
+    </div>
+  </div>
+  <div class="scene">
+    <div class="ico">4</div>
+    <div class="txt">
+      <div class="t">「帮我写这周的自习周报」</div>
+      <div class="d">→ 读 Skill 说明 → 查全部预约 → 生成 Markdown 文件，会告诉你文件路径，可以直接打开。</div>
+    </div>
+  </div>
+
+  <div class="quote">
+    <b>第 2 条是重点看的地方</b>：确认卡片弹出来时，先点「取消」演示一次，再点「确认」演示一次 ——
+    <b>让评委看到「系统真的会停下来等人」</b>。
+  </div>
+</section>
+
+<!-- ========== 9 开源复用 ========== -->
+<section class="slide">
+  <div class="kicker">08 · 开源复用说明</div>
+  <h2>基座是别人的，业务是自己的</h2>
+  <p class="sect-sub">用了开源骨架，但不只是换个皮 —— 每一层都重写过。</p>
+
+  <table>
+    <thead><tr><th style="width:48%">来自 <code>lhh737/LangChain-ReAct-Agent</code>（MIT）</th><th>自己重写的</th></tr></thead>
+    <tbody>
+      <tr><td>Agent → 工具 → 界面的整体分层</td><td><b>7 个工具</b>（全部，含参数校验与业务规则）</td></tr>
+      <tr><td>ReAct 循环的结构（想 → 调 → 看 → 再想）</td><td><b>模拟教务后端</b>（6 个接口 + 预约规则 + SQLite）</td></tr>
+      <tr><td>项目目录组织方式</td><td><b>人工确认中间件</b>（拦截预约/取消，弹卡片）</td></tr>
+      <tr><td>—</td><td><b>周报 Skill</b>（SKILL.md + 模板 + 生成逻辑）</td></tr>
+      <tr><td>—</td><td><b>Streamlit 界面</b>（执行过程逐条可视化）</td></tr>
+      <tr><td>—</td><td><b>12 页汇报 PPT</b></td></tr>
+    </tbody>
+  </table>
+
+  <div class="quote">
+    MIT 协议允许修改、商用、再发布，唯一要求是<b>保留版权声明</b>。README 里已写明出处。
+    <b>用开源不丢人，装作全是自己写的才丢人。</b>
+  </div>
+</section>
+
+<!-- ========== 10 不足 ========== -->
+<section class="slide">
+  <div class="kicker">09 · 现在做不到的四件事</div>
+  <h2>四个已知短板</h2>
+  <p class="sect-sub">这些不是「以后也许」，是现在已经确认做不到的。</p>
+
+  <div class="grid2">
+    <div class="card">
+      <div class="num">1</div>
+      <h3>不连真实教务系统</h3>
+      <p>学校不开放接口。真要接，得走信息中心审批，不是技术问题。</p>
+    </div>
+    <div class="card">
+      <div class="num">2</div>
+      <h3>没有并发控制</h3>
+      <p>两个人同时约同一个座位，<b>可能都显示成功</b>。要加数据库层面的锁才能解决。</p>
+    </div>
+    <div class="card">
+      <div class="num">3</div>
+      <h3>不会主动提醒</h3>
+      <p>没有定时任务，到点不会推消息。约了不去，系统也不知道。</p>
+    </div>
+    <div class="card">
+      <div class="num">4</div>
+      <h3>模型偶尔跳步</h3>
+      <p>有时不调工具就直接回答。界面会警告「本轮无工具调用，结论不可信」，但<strong style="color:var(--gold)">这只能提醒，不能阻止</strong>。</p>
+    </div>
+  </div>
+
+  <div class="quote">
+    <b>下一步（按优先级）</b>：① 加并发锁（最影响可信度）② 接真实接口 ③ 加定时提醒 ④ 换更强的模型减少跳步。
+  </div>
+</section>
+
+<!-- ========== 12 致谢 ========== -->
+<section class="slide cover">
+  <div class="kicker">谢谢</div>
+  <h1>完</h1>
+  <p class="lead" style="margin-top:8px">
+    代码：<code>D:\AI\campus-seat-agent</code><br>
+    基座：lhh737/LangChain-ReAct-Agent（MIT）<br>
+    离线测试：12 条全部通过
+  </p>
+  <div class="meta">
+    <div><div class="k">追问欢迎</div><div class="v">架构 / 工具 / 确认机制 / Skill</div></div>
+  </div>
+</section>
+
+</div>
+
+<div class="footer">
+  <span>校园自习室座位预约助手 · 开源 AI 技术实践</span>
+</div>
+<div class="controls" id="controls">
+  <button class="ctl arrow" id="prevBtn" title="上一页（←）">‹</button>
+  <span class="ctlnum" id="pageNo">1 / 11</span>
+  <button class="ctl arrow" id="nextBtn" title="下一页（→）">›</button>
+</div>
+<div class="progress"><i id="bar" style="width:9.1%"></i></div>
+<div class="hint">← → 翻页 · Home 首页 · End 末页</div>
+
+<script>
+  const slides = Array.from(document.querySelectorAll('.slide'));
+  const pageNo = document.getElementById('pageNo');
+  const bar = document.getElementById('bar');
+  const prevBtn = document.getElementById('prevBtn');
+  const nextBtn = document.getElementById('nextBtn');
+  let i = 0;
+
+  function show(n){
+    i = Math.max(0, Math.min(slides.length - 1, n));
+    slides.forEach((s, k) => s.classList.toggle('active', k === i));
+    pageNo.textContent = (i + 1) + ' / ' + slides.length;
+    bar.style.width = ((i + 1) / slides.length * 100) + '%';
+    slides[i].scrollTop = 0;
+    prevBtn.disabled = (i === 0);
+    nextBtn.disabled = (i === slides.length - 1);
+    history.replaceState(null, '', '#' + (i + 1));
+  }
+
+  /* 显式按钮：阻断冒泡，否则会同时触发 deck 的点击翻页，一下翻两页 */
+  prevBtn.addEventListener('click', e => { e.stopPropagation(); show(i - 1); });
+  nextBtn.addEventListener('click', e => { e.stopPropagation(); show(i + 1); });
+  document.getElementById('controls').addEventListener('click', e => e.stopPropagation());
+
+  document.addEventListener('keydown', e => {
+    if (['ArrowRight','PageDown',' '].includes(e.key)) { e.preventDefault(); show(i + 1); }
+    else if (['ArrowLeft','PageUp'].includes(e.key)) { e.preventDefault(); show(i - 1); }
+    else if (e.key === 'Home') { e.preventDefault(); show(0); }
+    else if (e.key === 'End') { e.preventDefault(); show(slides.length - 1); }
+  });
+
+  /* 全屏点击翻页已禁用 —— 演示时极易误触（点空白、点卡片、点表格都会翻页）。
+     现在只能通过底部 ‹ › 按钮或键盘 ← → 翻页。
+     若以后想恢复，解开下面注释即可：
+  document.getElementById('deck').addEventListener('click', e => {
+    if (e.clientX > window.innerWidth * 0.62) show(i + 1);
+    else if (e.clientX < window.innerWidth * 0.38) show(i - 1);
+  });
+  */
+
+  const startPage = parseInt((location.hash || '').replace('#', ''), 10);
+  show(Number.isFinite(startPage) && startPage >= 1 ? startPage - 1 : 0);
+</script>
+</body>
+</html>

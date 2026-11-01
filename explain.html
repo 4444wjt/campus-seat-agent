@@ -1,0 +1,452 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>校园座位预约 Agent · 技术解释</title>
+<style>
+  :root{
+    --bg:#f7f9fc; --panel:#fff; --line:#d8e0ea; --line-soft:#e9eff6;
+    --fg:#16202c; --fg-mid:#5a6b7d; --fg-dim:#8fa0b3;
+    --blue:#2f6fed; --blue-bg:#eaf1ff; --blue-line:#b9d0ff;
+    --green:#0f9d58; --green-bg:#e8f7ee; --green-line:#a8dfc0;
+    --orange:#d97706; --orange-bg:#fff6e8; --orange-line:#f5cf9a;
+    --purple:#7c3aed; --purple-bg:#f4eeff; --purple-line:#d9c8f8;
+    --r:10px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    background:var(--bg); color:var(--fg); font-size:14px; line-height:1.7;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:1240px;margin:0 auto;padding:40px 24px 80px}
+
+  /* ---------- 头部 ---------- */
+  header{margin-bottom:36px}
+  header h1{font-size:clamp(1.7rem,3vw,2.4rem);font-weight:750;letter-spacing:-.03em;line-height:1.25}
+  header p{margin-top:12px;font-size:15px;color:var(--fg-mid);max-width:800px}
+  .badge{
+    display:inline-block;margin-top:16px;padding:4px 12px;border-radius:20px;
+    background:var(--blue-bg);border:1px solid var(--blue-line);color:var(--blue);
+    font-size:12.5px;font-weight:600;
+  }
+
+  /* ---------- 两栏 ---------- */
+  .main{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.05fr);gap:24px;margin-bottom:44px}
+  @media (max-width:980px){ .main{grid-template-columns:1fr} }
+
+  /* ---------- 架构图 ---------- */
+  .arch{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:22px}
+  .arch-title{font-size:13px;font-weight:700;color:var(--fg-dim);letter-spacing:.06em;margin-bottom:18px}
+  .arch-list{display:flex;flex-direction:column;align-items:stretch;gap:0}
+  .node{
+    position:relative;border:1.5px solid var(--line);border-radius:var(--r);
+    padding:13px 16px;background:#fff;cursor:pointer;
+    transition:all .2s ease;
+  }
+  .node:hover{border-color:var(--blue);box-shadow:0 3px 12px rgba(47,111,237,.10);transform:translateY(-1px)}
+  .node.on{border-color:var(--blue);background:var(--blue-bg);box-shadow:0 0 0 3px rgba(47,111,237,.10)}
+  .node .name{font-size:14px;font-weight:650;display:flex;align-items:center;gap:8px}
+  .node .tag{
+    font-size:10.5px;font-weight:600;padding:1px 8px;border-radius:20px;
+    background:var(--line-soft);color:var(--fg-mid);
+  }
+  .node.on .tag{background:#fff;color:var(--blue)}
+  .node .one{font-size:12.5px;color:var(--fg-mid);margin-top:4px}
+
+  .arrow{
+    height:26px;display:flex;align-items:center;justify-content:center;
+    color:var(--fg-dim);font-size:13px;
+  }
+  .arrow::before{content:"↓"}
+
+  /* 侧边节点（模型 / 存储） */
+  .side{
+    margin-left:22px;border-left:2px dashed var(--line);padding-left:18px;
+    margin-top:-4px;margin-bottom:8px;
+  }
+  .side .node{border-style:dashed;background:#fcfdff}
+  .side .label{font-size:11px;color:var(--fg-dim);margin-bottom:6px;font-weight:600}
+
+  /* 分组框 */
+  .group{
+    border:1.5px dashed var(--orange-line);background:var(--orange-bg);
+    border-radius:var(--r);padding:12px 14px;
+  }
+  .group .gtitle{font-size:11.5px;font-weight:700;color:var(--orange);margin-bottom:8px}
+  .group .chips{display:flex;flex-wrap:wrap;gap:6px}
+  .chip{
+    padding:4px 10px;border-radius:6px;background:#fff;border:1px solid var(--orange-line);
+    font-size:11.5px;color:#8a5100;font-weight:600;cursor:pointer;transition:all .15s;
+  }
+  .chip:hover{background:#fff4e0}
+  .chip.on{background:var(--orange);color:#fff;border-color:var(--orange)}
+
+  /* ---------- 解释面板 ---------- */
+  .explain{
+    background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:26px 28px;
+    position:sticky;top:24px;align-self:start;
+  }
+  .ex-empty{text-align:center;padding:70px 20px;color:var(--fg-dim)}
+  .ex-empty .big{font-size:34px;margin-bottom:12px;opacity:.35}
+  .ex-head{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+  .ex-head h2{font-size:19px;font-weight:700;letter-spacing:-.02em}
+  .ex-sub{font-size:13px;color:var(--fg-mid);margin-bottom:22px;padding-bottom:18px;border-bottom:1px solid var(--line-soft)}
+
+  .ex-block{margin-bottom:20px}
+  .ex-block:last-child{margin-bottom:0}
+  .ex-label{
+    font-size:11px;font-weight:700;color:var(--fg-dim);letter-spacing:.07em;
+    margin-bottom:7px;display:flex;align-items:center;gap:6px;
+  }
+  .ex-label::before{content:"";width:3px;height:12px;border-radius:2px;background:var(--blue)}
+  .ex-block.why .ex-label::before{background:var(--orange)}
+  .ex-block.here .ex-label::before{background:var(--green)}
+  .ex-text{font-size:13.5px;color:#2b3a4a;line-height:1.75}
+  .ex-text b{font-weight:650;color:var(--fg)}
+  .ex-text code{
+    background:#f2f5f9;padding:1px 6px;border-radius:4px;
+    font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:12.5px;color:#b0245a;
+  }
+  .analogy{
+    margin-top:14px;padding:12px 14px;border-radius:8px;
+    background:linear-gradient(135deg,#fffbf0,#fff7e6);border:1px solid var(--orange-line);
+    font-size:13px;color:#7a4a00;
+  }
+  .analogy b{color:#5c3700}
+
+  /* ---------- 工具区 ---------- */
+  .section-title{font-size:20px;font-weight:720;letter-spacing:-.02em;margin-bottom:6px}
+  .section-sub{font-size:13.5px;color:var(--fg-mid);margin-bottom:22px}
+
+  .tools{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:14px;margin-bottom:44px}
+  .tool{
+    background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:16px 18px;
+    transition:all .2s ease;
+  }
+  .tool:hover{border-color:var(--blue);box-shadow:0 3px 14px rgba(47,111,237,.09);transform:translateY(-2px)}
+  .tool .tname{
+    font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:13px;font-weight:700;
+    color:#1a4fa8;margin-bottom:8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+  }
+  .tool .kind{font-family:inherit;font-size:10px;font-weight:700;padding:1px 7px;border-radius:4px}
+  .kind.read{background:var(--green-bg);color:var(--green)}
+  .kind.write{background:#fdecec;color:#c62828}
+  .kind.meta{background:var(--purple-bg);color:var(--purple)}
+  .tool .tdesc{font-size:12.5px;color:var(--fg-mid);line-height:1.65}
+  .tool .tnote{
+    margin-top:10px;padding-top:10px;border-top:1px dashed var(--line-soft);
+    font-size:11.5px;color:var(--orange);
+  }
+
+  /* ---------- 数据流 ---------- */
+  .flow{
+    background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:24px 26px;
+    margin-bottom:32px;
+  }
+  .steps{display:flex;flex-direction:column;gap:0}
+  .step{display:flex;gap:16px;position:relative;padding-bottom:22px}
+  .step:last-child{padding-bottom:0}
+  .step::before{
+    content:"";position:absolute;left:13px;top:30px;bottom:0;width:2px;
+    background:var(--line-soft);
+  }
+  .step:last-child::before{display:none}
+  .step .n{
+    flex:0 0 28px;width:28px;height:28px;border-radius:50%;
+    background:var(--blue);color:#fff;font-size:12.5px;font-weight:700;
+    display:flex;align-items:center;justify-content:center;position:relative;z-index:1;
+  }
+  .step .body{flex:1;padding-top:2px}
+  .step .st{font-size:13.5px;font-weight:650;margin-bottom:3px}
+  .step .sd{font-size:12.5px;color:var(--fg-mid);line-height:1.65}
+
+  /* ---------- 安全设计 ---------- */
+  .safety{
+    background:linear-gradient(135deg,#fff8f8,#fff1f1);border:1px solid #f5c6c6;
+    border-radius:14px;padding:22px 26px;
+  }
+  .safety h3{font-size:16px;font-weight:700;color:#a01a1a;margin-bottom:10px}
+  .safety p{font-size:13.5px;color:#7a2a2a;line-height:1.8}
+  .safety b{color:#7d1010}
+
+  footer{margin-top:44px;padding-top:20px;border-top:1px solid var(--line);font-size:12px;color:var(--fg-dim)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <h1>校园座位预约 Agent · 这个项目用了什么技术</h1>
+    <p>点左边的方块，右边会告诉你：<b>这是什么、为什么用它、在这个项目里干了什么</b>。全部用大白话讲，不懂代码也能看懂。</p>
+    <span class="badge">基座：GitHub · lhh737/LangChain-ReAct-Agent（MIT）· 业务部分全部重写</span>
+  </header>
+
+  <div class="main">
+    <!-- 架构图 -->
+    <div class="arch">
+      <div class="arch-title">点击任意方块查看解释</div>
+      <div class="arch-list" id="arch"></div>
+    </div>
+
+    <!-- 解释面板 -->
+    <aside class="explain" id="explain">
+      <div class="ex-empty">
+        <div class="big">←</div>
+        点左边任意一个方块
+      </div>
+    </aside>
+  </div>
+
+  <!-- 7 个工具 -->
+  <div class="section-title">7 个工具：模型能做的实际动作</div>
+  <div class="section-sub">模型本身只会说话，真正查数据、改数据要靠这 7 个函数。分三类：查的、改的、元操作。</div>
+  <div class="tools" id="tools"></div>
+
+  <!-- 一轮对话怎么跑 -->
+  <div class="flow">
+    <div class="section-title" style="font-size:17px;margin-bottom:16px">一轮对话到底发生了什么</div>
+    <div class="steps">
+      <div class="step">
+        <div class="n">1</div>
+        <div class="body">
+          <div class="st">你说一句话</div>
+          <div class="sd">比如「帮我约明天下午三楼的靠窗座位」。</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="n">2</div>
+        <div class="body">
+          <div class="st">系统把「你的话 + 系统提示词 + 历史对话」打包发给模型</div>
+          <div class="sd">系统提示词里已经塞好了：今天是几号、本周是哪几天、你是谁、有哪些 Skill 可用。</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="n">3</div>
+        <div class="body">
+          <div class="st">模型说「我要调 <code>query_free_seats</code>，参数是……」</div>
+          <div class="sd">这一步叫 <b>Tool Calling</b>。模型不直接查库，它只是「点菜」。</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="n">4</div>
+        <div class="body">
+          <div class="st">代码真的去查了，把结果塞回给模型</div>
+          <div class="sd">模型看到「三楼有 5 个空座，其中靠窗 2 个」，再决定下一步。</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="n">5</div>
+        <div class="body">
+          <div class="st">模型说要调 <code>book_seat</code> —— 这里被<b>拦住了</b></div>
+          <div class="sd">人工确认中间件发现这是「改数据」的动作，暂停执行，弹一张卡片给你：<b>「即将预约：三楼 12 号座，明天 14:00-16:00」</b>。</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="n">6</div>
+        <div class="body">
+          <div class="st">你点「确认」或「取消」</div>
+          <div class="sd">点确认 → 继续执行，真的写进数据库。点取消 → 这一步作废，模型会换个说法。</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="n">7</div>
+        <div class="body">
+          <div class="st">整轮对话被存进 SQLite</div>
+          <div class="sd">包括你说了什么、调了哪些工具、结果是什么。刷新页面不会丢，下次还能接着聊。</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 安全设计 -->
+  <div class="safety">
+    <h3>为什么「预约」和「取消」一定要弹确认？</h3>
+    <p>
+      因为 <b>模型会犯错</b>。它可能听错日期、算错座位号，甚至把「取消明天」理解成「取消今天」。
+      如果让它直接改数据库，<b>你的座位就没了，而且没有任何人点过头</b>。<br><br>
+      所以这个项目把所有动作分成两类：<b>「查」的随便跑，「改」的必须先问人</b>。
+      这不是技术做不到，而是<b>故意不让它自己决定</b> —— 责任留给人。
+    </p>
+  </div>
+
+  <footer>
+    基于 <code>D:\AI\campus-seat-agent</code> 的实际代码整理 ·
+    技术栈：Streamlit + LangChain + LangGraph + DeepSeek（OpenAI 兼容）+ SQLite
+  </footer>
+</div>
+
+<script>
+/* ============ 数据 ============ */
+const NODES = {
+  user: {
+    name: "用户（你）", tag: "输入端",
+    one: "在网页里打字说话",
+    what: "就是你。在浏览器里输入一句话，比如「帮我约明天下午的座位」。",
+    why: "整个系统存在的唯一理由 —— 让「说一句话就能办事」成立，而不是让你去填一堆表单。",
+    here: "所有交互的起点。你的每句话会被打包成一条消息，发给后面的 Agent。",
+    analogy: "**像点外卖**：你说「要一份宫保鸡丁」，不用管厨房怎么备料、怎么炒。"
+  },
+  ui: {
+    name: "Streamlit", tag: "界面层",
+    one: "用 Python 写网页，不用懂前端",
+    what: "一个 Python 库。你不用写 HTML/CSS/JS，用 Python 写几十行就能出一个能交互的网页。",
+    why: "如果自己写前端，要学 React 或 Vue，还要处理打包、路由、状态管理 —— 光界面就得花一周。Streamlit 让「先跑通」变成一两天的事。",
+    here: "负责三件事：① 显示对话气泡 ② 折叠式显示「执行过程」（每一步调了哪个工具、返回什么）③ 在需要确认时弹出按钮。",
+    analogy: "**像乐高说明书**：零件都给你配好了，你只要按图拼，不用自己烧砖。"
+  },
+  agent: {
+    name: "LangChain Agent", tag: "核心",
+    one: "决定「什么时候调哪个工具」的大脑",
+    what: "LangChain 是一个「让大模型能调用外部函数」的框架。Agent 是它里面的一种模式：模型自己决定下一步做什么，而不是你写死流程。",
+    why: "如果不这样，你得写一堆 if-else：「如果用户说'约座'就调 book_seat，如果说'查空座'就调 query_free_seats」—— 用户换个说法就崩了。交给模型判断，能听懂各种说法。",
+    here: "这是整个项目的中心。它持有三样东西：模型（会说话）、7 个工具（会干活）、3 个中间件（管流程）。每一轮它都在循环：「想 → 调工具 → 看结果 → 再想」，直到给出最终回答。",
+    analogy: "**像餐厅经理**：客人说什么他都听得懂，然后决定「这单该叫厨房还是叫前台」。他不亲自炒菜，但知道该找谁。"
+  },
+  model: {
+    name: "DeepSeek", tag: "模型层",
+    one: "真正「听懂人话」的部分",
+    what: "一个大语言模型。它不查数据库、不做计算，只做一件事：**理解你说的话，然后决定下一步该干什么**。",
+    why: "为什么用 DeepSeek 而不是自己训一个？自己训要几百万和几十张显卡。DeepSeek 有 API，几块钱能用很久。",
+    here: "通过 **OpenAI 兼容接口**接入 —— 这意味着换模型只改两行配置（`LLM_BASE_URL` 和 `LLM_MODEL`），代码一行不用动。这也是为什么项目能同时支持 DeepSeek 和阿里百炼。",
+    analogy: "**像 USB 接口**：不管是罗技的鼠标还是闪迪的 U 盘，插上去都能用。OpenAI 兼容就是这个「接口标准」。"
+  },
+  middleware: {
+    name: "3 个中间件", tag: "流程控制",
+    one: "在模型和工具之间插一道关卡",
+    what: "中间件是「在请求到达工具之前 / 之后，插入一段自己的代码」。这个项目用了三个。",
+    why: "如果不插中间件，模型说调什么就直接调什么 —— 没有日志、没有确认、提示词也写不活。**中间件是「让 Agent 变得可控」的关键。**",
+    here: "① **动态提示词**：每一轮都重新拼系统提示词，把「今天几号、本周是哪几天、你是谁、有哪些 Skill」塞进去。② **工具日志**：每次调工具都往控制台记一行，出问题能查。③ **人工确认**：预约/取消前暂停，等人点按钮。",
+    analogy: "**像银行柜台的复核员**：柜员（模型）说要转账，复核员（中间件）先看一眼「金额对不对、收款人是谁」，然后才盖章。"
+  },
+  tools: {
+    name: "7 个工具", tag: "执行层",
+    one: "真正查库、改库的函数",
+    what: "7 个 Python 函数，每个都有一段「说明书」（docstring），告诉模型「我是干什么的、要什么参数」。",
+    why: "模型只会说话，不会查数据库。工具就是它的「手脚」。**没有工具，Agent 只能陪你聊天，办不了事。**",
+    here: "分三类：**查**（list_rooms / query_free_seats / my_bookings）、**改**（book_seat / cancel_booking，这两个必须确认）、**元**（export_weekly_report 生成周报、read_skill 读技能说明）。",
+    analogy: "**像给新员工的工具箱**：每个工具上贴着标签「这是螺丝刀，用来拧螺丝」。新员工（模型）看一眼标签就知道该拿哪个。"
+  },
+  backend: {
+    name: "模拟教务后端", tag: "数据层",
+    one: "假的教学系统 + 真的 SQLite 数据库",
+    what: "一个用 SQLite 存的「假教务系统」，有 6 个业务接口（查自习室、查空座、约座、取消、查我的预约、生成周报）。",
+    why: "为什么不做真对接？因为学校真实系统不开放接口，而且真接进去一按错就改真数据。**用假的先把流程跑通，是负责任的做法。**",
+    here: "所有工具最终都调它。它负责真正的读写，并带有业务规则（比如「只能取消未开始的预约」「同一时段不能重复约」）。",
+    analogy: "**像飞行模拟器**：飞行员先在模拟器里练，撞了也不会真坠机。练熟了再上真飞机。"
+  },
+  memory: {
+    name: "SqliteSaver", tag: "记忆层",
+    one: "把每轮对话存进数据库，刷新不丢",
+    what: "LangGraph 提供的一个「存档器」。它把整个对话状态（你说了什么、调了什么工具、结果是什么）序列化后存进 SQLite。",
+    why: "大模型本身**没有记忆** —— 每次调用都是全新的。如果不存，刷新页面就等于失忆。更关键的是：**人工确认要「暂停 → 等你点 → 继续」，这中间的状态必须存下来**，否则点了确认就接不上了。",
+    here: "每一轮结束都把状态写进 `data/checkpoints.db`。所以：① 刷新页面不丢对话 ② 确认中断后能接着跑 ③ 「新会话」按钮会换一个 `thread_id`，等于开一份新存档。",
+    analogy: "**像行车记录仪**：不是给你看的，是出事时能回放。这里的作用是「断点了能接上」。"
+  },
+  skill: {
+    name: "Skill（周报）", tag: "能力扩展",
+    one: "一份说明书 + 一个模板，按需加载",
+    what: "一个文件夹，里面放 `SKILL.md`（怎么做）和 `template.md`（用什么格式）。模型觉得需要时，先调 `read_skill` 把说明读进来，再照着做。",
+    why: "如果把所有细节都塞进系统提示词，会变得极长，模型反而抓不住重点，还费 token。**Skill 的思路是「用时再翻手册」，不是「全部背下来」。**",
+    here: "这个项目只有一个 Skill：`weekly-report`。你说「帮我写周报」，模型先读它的说明，再调 `my_bookings(include_past=True)` 拿数据，最后调 `export_weekly_report` 生成 Markdown 文件。",
+    analogy: "**像宜家的说明书**：装柜子时才翻那一页，不用把整本背下来。"
+  }
+};
+
+const TOOLS = [
+  { n:"list_rooms", k:"read", d:"列出所有自习室、座位数、靠窗/插座情况、每天可预约的时段。", note:"用户问「有哪些自习室」「几点能约」时先调它。" },
+  { n:"query_free_seats", k:"read", d:"查某自习室某天某时段的空座位，可选「靠窗」或「插座」。", note:"预约前必须先用它确认座位真的空着。" },
+  { n:"book_seat", k:"write", d:"为当前学生预约一个座位。", note:"⚠️ 会弹确认卡片，模型不能自己决定。" },
+  { n:"my_bookings", k:"read", d:"查看当前学生的预约记录，返回编号、自习室、座位、日期、时段。", note:"取消前用它找编号；写周报时用 include_past=True。" },
+  { n:"cancel_booking", k:"write", d:"取消一条预约，只能取消未开始的。", note:"⚠️ 会弹确认卡片。" },
+  { n:"export_weekly_report", k:"meta", d:"生成本周自习周报（Markdown 文件），保存到 workspace 目录。", note:"会返回文件路径，用户可以直接打开。" },
+  { n:"read_skill", k:"meta", d:"读取一个 Skill 的完整说明和它附带的模板文件。", note:"模型判断需要某个技能时，先调它再说。" }
+];
+
+/* ============ 渲染架构图 ============ */
+const archEl = document.getElementById("arch");
+
+function nodeHTML(key, extraClass = ""){
+  const n = NODES[key];
+  return `<div class="node ${extraClass}" data-key="${key}">
+    <div class="name">${n.name}<span class="tag">${n.tag}</span></div>
+    <div class="one">${n.one}</div>
+  </div>`;
+}
+
+archEl.innerHTML = `
+  ${nodeHTML("user")}
+  <div class="arrow"></div>
+  ${nodeHTML("ui")}
+  <div class="arrow"></div>
+  ${nodeHTML("agent")}
+  <div class="side">
+    <div class="label">互相调用</div>
+    ${nodeHTML("model")}
+  </div>
+  <div class="arrow"></div>
+  ${nodeHTML("middleware")}
+  <div class="arrow"></div>
+  ${nodeHTML("tools")}
+  <div class="arrow"></div>
+  ${nodeHTML("backend")}
+  <div class="side">
+    <div class="label">同时挂载</div>
+    ${nodeHTML("memory")}
+    ${nodeHTML("skill")}
+  </div>
+`;
+
+/* ============ 渲染工具卡 ============ */
+const toolsEl = document.getElementById("tools");
+const KIND = { read:"查询", write:"写入", meta:"元操作" };
+toolsEl.innerHTML = TOOLS.map(t => `
+  <div class="tool">
+    <div class="tname">${t.n}<span class="kind ${t.k}">${KIND[t.k]}</span></div>
+    <div class="tdesc">${t.d}</div>
+    <div class="tnote">${t.note}</div>
+  </div>
+`).join("");
+
+/* ============ 点击切换 ============ */
+const explainEl = document.getElementById("explain");
+
+function render(key){
+  const n = NODES[key];
+  explainEl.innerHTML = `
+    <div class="ex-head"><h2>${n.name}</h2></div>
+    <div class="ex-sub">${n.tag} · ${n.one}</div>
+
+    <div class="ex-block">
+      <div class="ex-label">这是什么</div>
+      <div class="ex-text">${n.what}</div>
+    </div>
+
+    <div class="ex-block why">
+      <div class="ex-label">为什么用它</div>
+      <div class="ex-text">${n.why}</div>
+    </div>
+
+    <div class="ex-block here">
+      <div class="ex-label">在这个项目里的具体作用</div>
+      <div class="ex-text">${n.here}</div>
+      <div class="analogy">${n.analogy.replace(/\*\*(.+?)\*\*/g, "<b>$1</b>")}</div>
+    </div>
+  `;
+}
+
+document.querySelectorAll(".node").forEach(el => {
+  el.addEventListener("click", () => {
+    document.querySelectorAll(".node").forEach(x => x.classList.remove("on"));
+    el.classList.add("on");
+    render(el.dataset.key);
+  });
+});
+
+/* 默认打开「Agent」——最关键的一环 */
+const def = document.querySelector('.node[data-key="agent"]');
+if (def) def.click();
+</script>
+</body>
+</html>
