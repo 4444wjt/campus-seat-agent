@@ -50,13 +50,15 @@ flowchart LR
 ## 安装与启动（Windows PowerShell）
 
 ```powershell
-git clone <本仓库地址>
+git clone https://gitee.com/kkbushishou/campus-seat-agent.git
 cd campus-seat-agent
 python -m venv .venv
 .venv\Scripts\activate
 pip install -r requirements.txt -i https://mirrors.aliyun.com/pypi/simple/
 copy .env.example .env
 ```
+
+> 备用地址（GitHub）：`https://github.com/4444wjt/campus-seat-agent.git`
 
 用记事本打开 `.env`，填写 `OPENAI_API_KEY`，然后启动：
 
