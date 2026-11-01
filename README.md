@@ -74,6 +74,34 @@ streamlit run app.py
 python -c "from backend.campus_api import init_db; init_db(reset=True)"
 ```
 
+### 不填 API Key 也能先验证后端（30 秒）
+
+Agent 只是包在后端外面的一层壳，**后端本身不依赖大模型**。所以还没配 Key 时，可以先跑这段确认业务接口是通的：
+
+```powershell
+.venv\Scripts\python.exe -c "from backend import campus_api as a; import json; print(json.dumps(a.list_rooms()['data'], ensure_ascii=False)[:300])"
+```
+
+预期：打印出自习室名称、座位数、可约时段。
+
+**能看到这段输出，就说明业务层正常** —— 后面如果还有问题，一定出在模型或 Key 上，不在业务代码里。
+
+也可以直接测**规则拒绝**（绕开 Agent，因此不会弹确认卡片，也**不会写库**）：
+
+```powershell
+.venv\Scripts\python.exe -c "from datetime import date, timedelta; from backend import campus_api as a; d=(date.today()+timedelta(days=30)).isoformat(); r=a.book_seat('三楼',1,d,'14:00-16:00'); print(d, '| ok=', r['ok'], '|', r['message'])"
+```
+
+预期输出类似：
+
+```
+2026-12-01 | ok= False | 2026-12-01 超出可预约范围，仅可预约今天至 2026-11-08 之间的座位。
+```
+
+**`ok=False` 且带中文原因，说明业务规则真的在生效**（只允许约今天起 7 天内）。
+
+这条不写库，可以放心反复执行。想看成功路径：把 `timedelta(days=30)` 改成 `days=1`，**同时换一个你没约过的时段**（同一个人同一时段只能约 1 个座，只换座位号没用）。
+
 运行测试（不需要 API Key）：
 
 ```powershell
